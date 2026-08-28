@@ -674,3 +674,48 @@ class TFTExplainabilityResult(ComponentBasedExplainabilityResult):
         of `TimeSeries`.
         """
         return self.get_explanation("decoder_importance_over_time")
+
+
+class NBEATSExplainabilityResult(ComponentBasedExplainabilityResult):
+    """
+    Stores the explainability results of an :class:`NBEATSExplainer
+    <darts.explainability.nbeats_explainer.NBEATSExplainer>` with convenient access to the results. It extends the
+    :class:`ComponentBasedExplainabilityResult` and carries information specific to the N-BEATS explainer.
+
+    - :func:`get_trend() <NBEATSExplainabilityResult.get_trend>`: the forecast produced by the trend stack.
+    - :func:`get_seasonality() <NBEATSExplainabilityResult.get_seasonality>`: the forecast produced by the
+      seasonality stack.
+
+    Examples
+    --------
+    >>> from darts.datasets import AirPassengersDataset
+    >>> from darts.explainability import NBEATSExplainer
+    >>> from darts.models import NBEATSModel
+    >>>
+    >>> series = AirPassengersDataset().load()
+    >>> model = NBEATSModel(
+    >>>     input_chunk_length=24, output_chunk_length=12, generic_architecture=False
+    >>> )
+    >>> model.fit(series)
+    >>>
+    >>> explainer = NBEATSExplainer(model)
+    >>> result = explainer.explain()
+    >>> trend = result.get_trend()
+    >>> seasonality = result.get_seasonality()
+    """
+
+    def get_trend(self) -> TimeSeries | list[TimeSeries]:
+        """
+        Returns the forecast produced by the trend stack, as a `TimeSeries`. If multiple series were used in
+        :func:`NBEATSExplainer.explain() <darts.explainability.nbeats_explainer.NBEATSExplainer.explain>`, returns
+        a list of `TimeSeries`.
+        """
+        return self.get_explanation("trend")
+
+    def get_seasonality(self) -> TimeSeries | list[TimeSeries]:
+        """
+        Returns the forecast produced by the seasonality stack, as a `TimeSeries`. If multiple series were used in
+        :func:`NBEATSExplainer.explain() <darts.explainability.nbeats_explainer.NBEATSExplainer.explain>`, returns
+        a list of `TimeSeries`.
+        """
+        return self.get_explanation("seasonality")

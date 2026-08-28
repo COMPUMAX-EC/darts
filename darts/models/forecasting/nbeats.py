@@ -431,6 +431,10 @@ class _NBEATSModule(PLForecastingModule):
         self.dropout = dropout
         self.batch_norm = batch_norm
         self.activation = activation
+        self.generic_architecture = generic_architecture
+        # forecast produced by each individual stack during the last `forward()` call, used by `NBEATSExplainer`
+        # (only meaningful when `generic_architecture=False`, where stacks correspond to trend/seasonality)
+        self._stacks_forecasts: list[torch.Tensor] | None = None
 
         if generic_architecture:
             self.stacks_list = [
@@ -508,12 +512,14 @@ class _NBEATSModule(PLForecastingModule):
             dtype=x.dtype,
         )
 
+        stacks_forecasts = []
         for stack in self.stacks_list:
             # compute stack output
             stack_residual, stack_forecast = stack(x)
 
             # add stack forecast to final output
             y = y + stack_forecast
+            stacks_forecasts.append(stack_forecast)
 
             # set current stack residual as input for next stack
             x = stack_residual
@@ -522,9 +528,16 @@ class _NBEATSModule(PLForecastingModule):
         # We want to reshape to original format. We also get rid of the covariates and keep only the target dimensions.
         # The covariates are by construction added as extra time series on the right side. So we need to get rid of this
         # right output (keeping only :self.output_dim).
-        y = y.view(
-            y.shape[0], self.output_chunk_length, self.input_dim, self.nr_params
-        )[:, :, : self.output_dim, :]
+        def _to_output_shape(t: torch.Tensor) -> torch.Tensor:
+            return t.view(
+                t.shape[0], self.output_chunk_length, self.input_dim, self.nr_params
+            )[:, :, : self.output_dim, :]
+
+        # store the per-stack forecasts (in the interpretable architecture, these correspond to the trend and
+        # seasonality components) so that `NBEATSExplainer` can retrieve them after calling `model.predict()`.
+        self._stacks_forecasts = [_to_output_shape(sf) for sf in stacks_forecasts]
+
+        y = _to_output_shape(y)
 
         return y
 
