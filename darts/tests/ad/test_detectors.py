@@ -282,6 +282,39 @@ class TestAnomalyDetectionDetector:
         with pytest.raises(ValueError):
             detector.detect([self.train, self.mts_train])
 
+    @pytest.mark.parametrize(
+        "detector_cls,detector_kwargs",
+        [
+            (QuantileDetector, {"low_quantile": 0.1, "high_quantile": 0.9}),
+            (QuantileDetector, {"high_quantile": 0.9}),
+            (IQRDetector, {}),
+        ],
+    )
+    def test_quantile_detector_refit_different_width(
+        self, detector_cls, detector_kwargs
+    ):
+        """Fitting must not overwrite the user-defined quantiles, so that a detector created
+        with single quantile values can be re-fitted on series with a different width."""
+        detector = detector_cls(**detector_kwargs)
+        low_quantile, high_quantile = detector.low_quantile, detector.high_quantile
+
+        detector.fit(self.mts_train)
+        assert len(detector.high_threshold) == self.mts_train.width
+        assert detector.low_quantile == low_quantile
+        assert detector.high_quantile == high_quantile
+
+        detector.fit(self.train)
+        assert len(detector.high_threshold) == self.train.width
+        assert detector.detect(self.test).width == self.test.width
+
+        # re-fitting on the original series gives the same thresholds as a fresh detector
+        detector.fit(self.mts_train)
+        fresh = detector_cls(**detector_kwargs).fit(self.mts_train)
+        np.testing.assert_array_equal(
+            np.array(detector.high_threshold, dtype=float),
+            np.array(fresh.high_threshold, dtype=float),
+        )
+
     def test_ThresholdDetector_constructor(self):
         # Need to have at least one parameter (low, high) not None
         with pytest.raises(ValueError):

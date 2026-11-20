@@ -79,9 +79,10 @@ class QuantileDetector(FittableDetector, _BoundedDetectorMixin):
                 ),
             )
 
-        # otherwise, make them the right length
-        self.low_quantile = self._expand_threshold(series[0], self.low_quantile)
-        self.high_quantile = self._expand_threshold(series[0], self.high_quantile)
+        # otherwise, make them the right length (without overwriting the user-defined
+        # quantiles, so that the detector can be re-fitted on series of a different width)
+        low_quantile = self._expand_threshold(series[0], self.low_quantile)
+        high_quantile = self._expand_threshold(series[0], self.high_quantile)
 
         # concatenate everything along the time axis
         np_series = np.concatenate(
@@ -99,11 +100,11 @@ class QuantileDetector(FittableDetector, _BoundedDetectorMixin):
         # TODO: we could make this more efficient when low_quantile or high_quantile contain a single value
         low_threshold = [
             np.nanquantile(np_series[:, i], q=lo, axis=0) if lo is not None else None
-            for i, lo in enumerate(self.low_quantile)
+            for i, lo in enumerate(low_quantile)
         ]
         high_threshold = [
             np.nanquantile(np_series[:, i], q=hi, axis=0) if hi is not None else None
-            for i, hi in enumerate(self.high_quantile)
+            for i, hi in enumerate(high_quantile)
         ]
 
         self.detector = ThresholdDetector(
